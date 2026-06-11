@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood-Based Product Recommender</title>
+    <!-- Load face-api.js -->
+    <script defer src="https://jsdelivr.net"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f4f7f6; padding: 20px; }
+        #video { border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .container { position: relative; display: inline-block; }
+        canvas { position: absolute; top: 0; left: 0; }
+        .result-box { margin-top: 20px; background: white; padding: 20px; border-radius: 10px; display: inline-block; max-width: 400px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h3 { color: #333; margin-top: 0; }
+        #product-link { display: inline-block; margin-top: 15px; padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>How are you feeling today?</h2>
+    <p>Allow camera access to see your mood and get a tailored recommendation.</p>
+
+    <div class="container">
+        <video id="video" width="640" height="480" autoplay muted></video>
+    </div>
+
+    <div class="result-box">
+        <h3>Detected Mood</h3>
+        <p id="mood-text">Scanning face...</p>
+        <h3>Recommended For You</h3>
+        <p id="recommendation-text">Please wait while the camera loads...</p>
+        <a id="product-link" href="#" target="_blank" style="display: none;">Shop Now</a>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const moodText = document.getElementById('mood-text');
+        const recommendationText = document.getElementById('recommendation-text');
+        const productLink = document.getElementById('product-link');
+
+        // Load models from CDN
+        async function loadModels() {
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://jsdelivr.net');
+            await faceapi.nets.faceExpressionNet.loadFromUri('https://jsdelivr.net');
+            startVideo();
+        }
+
+        // Start camera
+        function startVideo() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => { video.srcObject = stream; })
+                .catch(err => { console.error("Camera error: ", err); });
+        }
+
+        video.addEventListener('play', () => {
+            const canvas = faceapi.createCanvasFromMedia(video);
+            document.querySelector('.container').append(canvas);
+            const displaySize = { width: video.width, height: video.height };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            setInterval(async () => {
+                const detections = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
+                
+                if (detections) {
+                    const expressions = detections.expressions;
+                    // Find the emotion with the highest probability
+                    const dominantMood = Object.keys(expressions).reduce((a, b) => expressions[a] > expressions[b] ? a : b);
+                    
+                    updateUI(dominantMood);
+                }
+            }, 3000); // Scans every 3 seconds
+        });
+
+        // Recommend products based on mood
+        function updateUI(mood) {
+            const moodMap = {
+                happy: { text: "You're glowing! Keep the good vibes going with a refreshing tropical smoothie or a cheerful summer read.", product: "Tropical Smoothie Kit", link: "https://example.com" },
+                sad: { text: "Having a tough day? Treat yourself to something cozy. A warm herbal tea or a comforting novel might help.", product: "Cozy Herbal Tea Set", link: "https://example.com" },
+                angry: { text: "Looks like you're stressed. Decompress with some relaxing aromatherapy, a yoga mat, or a stress-relief journal.", product: "Aromatherapy Diffuser", link: "https://example.com" },
+                surprised: { text: "Feeling adventurous today? Try a DIY craft kit or a mystery book box!", product: "Mystery Book Box", link: "https://example.com" },
+                fearful: { text: "Need a moment of peace? A weighted blanket or a guided meditation subscription can help you feel secure.", product: "Weighted Blanket", link: "https://example.com" },
+                disgusted: { text: "Need a reset? A fresh, crisp room spray or a calming skincare mask can clear the air.", product: "Calming Face Mask", link: "https://example.com" },
+                neutral: { text: "Keeping it steady! How about a productivity planner or a new desk plant to spruce up your space?", product: "Productivity Planner", link: "https://example.com" }
+            };
+
+            const currentMood = moodMap[mood] || moodMap['neutral'];
+            moodText.innerText = mood.charAt(0).toUpperCase() + mood.slice(1);
+            recommendationText.innerText = currentMood.text;
+            productLink.innerText = `Get the ${currentMood.product}`;
+            productLink.href = currentMood.link;
+            productLink.style.display = 'inline-block';
+        }
+
+        loadModels();
+    </script>
+</body>
+</html>
